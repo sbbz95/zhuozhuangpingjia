@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>服装评分系统</title>
+    <style>
+        /* 基础样式 */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .image-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 0
+            min-height: 0; /* 防止内容溢出 */
+        }
+        #body-img {
+            width: 280px;
+            height: 380px;
+            object-fit: contain;
+        }
+        #cloth-img {
+            width: 560px;  /* 体型图的2倍 */
+            height: 380px;
+            object-fit: contain;
+        }
+.score-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;  /* 水平居中 */
+    margin-top: 0;
+}
+
+/* 调整单个维度布局 */
+.dimension {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin: 10px 0;
+    width: fit-content;  /* 根据内容自适应宽度 */
+}
+
+.dimension-label {
+    width: 80px;
+    text-align: right;
+    font-weight: bold;
+    color: #555;
+}
+
+/* 调整按钮组间距 */
+.btn-group {
+    gap: 8px;
+}
+
+        .score-btn {
+            padding: 10px 18px;
+            background: #f0f0f0;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .score-btn.selected {
+            background: #4CAF50;
+            color: white;
+        }
+        #timer {
+            color: #e53935;
+            font-size: 16px;
+        }
+        #progress {
+            font-size: 14px;
+            color: #666;
+        }
+        .control-group {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+        .control-btn {
+            padding: 10px 25px;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+        #next-btn {
+            background: #2196F3;
+            color: white;
+        }
+        #export-btn {
+            background: #ff9800;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+<!-- 在<body>标签内添加开始按钮 -->
+<div id="start-screen" style="text-align: center; margin-top: 100px;">
+    <button id="start-btn" 
+            style="padding: 20px 40px; font-size: 24px; background: #4CAF50; color: white; border: none; border-radius: 50px;">
+        开始评分
+    </button>
+</div>
+<!-- 修改原有body内容为可隐藏容器 -->
+<div id="main-content" style="display: none;">
+    <!-- 原有header、image-container、score-section等内容保持不变 -->
+</div>
+
+    <div class="header">
+        <div id="progress">进度：0/270</div>
+        <div id="timer">剩余时间：10秒</div>
+    </div>
+
+    <div class="image-container">
+        <img id="body-img">
+        <img id="cloth-img">
+    </div>
+
+    <div class="score-section">
+        <div class="dimension">
+            <div class="dimension-label">肩部评分</div>
+            <div class="btn-group" data-dimension="shoulder">
+                <button class="score-btn" data-score="1">1</button>
+                <button class="score-btn" data-score="2">2</button>
+                <button class="score-btn" data-score="3">3</button>
+                <button class="score-btn" data-score="4">4</button>
+                <button class="score-btn" data-score="5">5</button>
+            </div>
+        </div>
+        <div class="dimension">
+            <div class="dimension-label">腰部评分</div>
+            <div class="btn-group" data-dimension="waist">
+                <button class="score-btn" data-score="1">1</button>
+                <button class="score-btn" data-score="2">2</button>
+                <button class="score-btn" data-score="3">3</button>
+                <button class="score-btn" data-score="4">4</button>
+                <button class="score-btn" data-score="5">5</button>
+            </div>
+        </div>
+        <div class="dimension">
+            <div class="dimension-label">下摆评分</div>
+            <div class="btn-group" data-dimension="hem">
+                <button class="score-btn" data-score="1">1</button>
+                <button class="score-btn" data-score="2">2</button>
+                <button class="score-btn" data-score="3">3</button>
+                <button class="score-btn" data-score="4">4</button>
+                <button class="score-btn" data-score="5">5</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="control-group">
+        <button class="control-btn" id="export-btn" onclick="exportData()">导出数据</button>
+        <button class="control-btn" id="next-btn" onclick="nextImage()">下一套</button>
+    </div>
+
+    <script>
+        // 全局配置
+        const config = {
+            totalImages: 270,
+            countdownTime: 10,
+            imageBasePath: 'images/',
+            dimensions: ['shoulder', 'waist', 'hem']
+        };
+
+        // 状态管理
+        let state = {
+            isStarted: false,      // 新增开始状态标识
+            currentImage: 1,
+            timer: null,
+            scores: { shoulder: 0, waist: 0, hem: 0 },
+            allData: []
+        };
+        // 新增开始评分函数
+        function startEvaluation() {
+            state.isStarted = true;
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('main-content').style.display = 'block';
+            initEvaluation();
+        }
+// 拆分初始化函数
+        function init() {
+            document.getElementById('start-btn').addEventListener('click', startEvaluation);
+        }
+
+        function initEvaluation() {
+            state.currentImage = 1;  // 重置为第一张
+            loadImage();
+            startTimer();
+            updateProgress();
+            document.querySelectorAll('.score-btn').forEach(btn => {
+                btn.addEventListener('click', handleScoreClick);
+            });
+        }
+        // 图片加载
+        function loadImage() {
+            document.getElementById('body-img').src = 
+                `${config.imageBasePath}${state.currentImage}_body.png`;
+            document.getElementById('cloth-img').src = 
+                `${config.imageBasePath}${state.currentImage}_cloth.png`;
+        }
+
+        // 倒计时控制
+        function startTimer() {
+            let seconds = config.countdownTime;
+            state.timer = setInterval(() => {
+                seconds--;
+                document.getElementById('timer').textContent = `剩余时间：${seconds}秒`;
+                
+                if (seconds <= 0) {
+                    handleTimeout();
+                }
+            }, 1000);
+        }
+
+        // 评分处理
+        function handleScoreClick(e) {
+            const dimension = e.target.parentElement.dataset.dimension;
+            const score = parseInt(e.target.dataset.score);
+            
+            // 更新按钮样式
+            e.target.parentElement.querySelectorAll('.score-btn').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            e.target.classList.add('selected');
+            
+            // 保存评分
+            state.scores[dimension] = score;
+            checkAllScored();
+        }
+
+        // 检查完成状态
+        function checkAllScored() {
+            const isComplete = config.dimensions.every(d => state.scores[d] > 0);
+            document.getElementById('next-btn').disabled = !isComplete;
+        }
+
+        // 超时处理
+        function handleTimeout() {
+            clearInterval(state.timer);
+            saveCurrentData(true); // 超时保存
+            proceedToNext();
+        }
+
+        // 下一张
+        function nextImage() {
+            clearInterval(state.timer);
+            saveCurrentData();
+            proceedToNext();
+        }
+
+        // 保存数据（包含强制保存模式）
+        function saveCurrentData(timeout = false) {
+            const data = {
+                imageId: state.currentImage,
+                ...state.scores
+            };
+            
+            // 超时情况下补全未评分项
+            if(timeout) {
+                config.dimensions.forEach(d => {
+                    if(data[d] === 0) data[d] = '未评分';
+                });
+            }
+            
+            state.allData.push(data);
+        }
+
+        // 进入下一套
+        function proceedToNext() {
+            if (state.currentImage >= config.totalImages) {
+                finishEvaluation();
+                return;
+            }
+            
+            state.currentImage++;
+            resetState();
+            updateProgress();
+            loadImage();
+            startTimer();
+        }
+
+        // 重置状态
+        function resetState() {
+            state.scores = { shoulder: 0, waist: 0, hem: 0 };
+            document.querySelectorAll('.score-btn').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            document.getElementById('next-btn').disabled = true;
+        }
+
+        // 更新进度
+        function updateProgress() {
+            document.getElementById('progress').textContent = 
+                `进度：${state.currentImage}/${config.totalImages}`;
+        }
+
+        // 导出数据
+        function exportData() {
+            // 保存当前进度
+            if(Object.values(state.scores).some(v => v > 0)) {
+                saveCurrentData();
+                proceedToNext(); // 自动跳转到下一套
+                state.currentImage--; // 修正进度显示
+                updateProgress();
+            }
+            
+            const csvContent = "data:text/csv;charset=utf-8," +
+                "图片ID,肩部评分,腰部评分,下摆评分\n" +
+                state.allData.map(item => 
+                    `${item.imageId},${item.shoulder},${item.waist},${item.hem}`
+                ).join("\n");
+            
+            const link = document.createElement('a');
+            link.href = encodeURI(csvContent);
+            link.download = `评分数据_${new Date().toISOString().slice(0,10)}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // 完成所有评价
+        function finishEvaluation() {
+            exportData();
+            alert('所有评价已完成！');
+            document.getElementById('next-btn').disabled = true;
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
